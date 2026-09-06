@@ -857,22 +857,105 @@ const WIN_STYLES = `
   inset: 0;
   pointer-events: none;
 }
-.win-deco span.falling {
+/* 유성우처럼 꼬리를 끌며 떨어지는 이모지. */
+.meteor {
   position: fixed;
-  top: -12vh;
+  top: -10vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  animation-name: meteor-fall;
+  animation-timing-function: linear;
+  animation-fill-mode: forwards;
   will-change: transform;
-  animation-name: win-fall, win-drift;
-  animation-timing-function: linear, ease-in-out;
-  animation-iteration-count: infinite, infinite;
 }
-@keyframes win-fall {
-  from { transform: translateY(0) rotate(0deg); }
-  to   { transform: translateY(130vh) rotate(900deg); }
+@keyframes meteor-fall {
+  from { transform: translate(0, 0) rotate(var(--tilt, 0deg)); }
+  to   { transform: translate(var(--drift, 0px), 122vh) rotate(var(--tilt, 0deg)); }
 }
-@keyframes win-drift {
-  0%, 100% { margin-left: -22px; }
-  50%      { margin-left: 22px; }
+.meteor-trail {
+  width: 3px;
+  height: 64px;
+  background: linear-gradient(to bottom, rgba(255, 255, 255, 0), rgba(255, 255, 255, 0.85));
+  border-radius: 2px;
+  margin-bottom: -8px;
 }
+.meteor-emoji {
+  font-size: 1.8rem;
+  filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.85));
+}
+
+/* 유성이 바닥에 닿았을 때 20% 확률로 터지는 폭발 이펙트. */
+.explosion {
+  position: fixed;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+.explosion .flash {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 10px;
+  height: 10px;
+  margin: -5px 0 0 -5px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #fff 0%, #ffcc11 35%, #ff7e00 65%, rgba(255, 0, 69, 0) 100%);
+  animation: explosion-flash 0.5s ease-out forwards;
+}
+@keyframes explosion-flash {
+  0%   { transform: scale(0.3); opacity: 1; }
+  60%  { transform: scale(9); opacity: 0.9; }
+  100% { transform: scale(13); opacity: 0; }
+}
+.explosion .ring {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 10px;
+  height: 10px;
+  margin: -5px 0 0 -5px;
+  border-radius: 50%;
+  border: 3px solid rgba(255, 204, 17, 0.9);
+  animation: explosion-ring 0.6s ease-out forwards;
+}
+@keyframes explosion-ring {
+  0%   { transform: scale(0.5); opacity: 1; }
+  100% { transform: scale(16); opacity: 0; }
+}
+.explosion .particle {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  animation-name: explosion-particle;
+  animation-timing-function: ease-out;
+  animation-fill-mode: forwards;
+}
+@keyframes explosion-particle {
+  0%   { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+  55%  { transform: translate(var(--px), var(--py)) scale(0.75); opacity: 1; }
+  100% { transform: translate(var(--pxEnd), var(--pyEnd)) scale(0.15); opacity: 0; }
+}
+.explosion .particle.shape-circle   { border-radius: 50%; }
+.explosion .particle.shape-square   { border-radius: 1px; }
+.explosion .particle.shape-triangle { clip-path: polygon(50% 0%, 0% 100%, 100% 100%); }
+.explosion .particle.shape-diamond  { clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%); }
+.explosion .smoke {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(90, 90, 90, 0.55), rgba(90, 90, 90, 0));
+  filter: blur(2px);
+  animation-name: explosion-smoke;
+  animation-timing-function: ease-out;
+  animation-fill-mode: forwards;
+}
+@keyframes explosion-smoke {
+  0%   { transform: translate(-50%, -60%) scale(0.4); opacity: 0.6; }
+  100% { transform: translate(var(--sx), var(--sy)) scale(2.2); opacity: 0; }
+}
+
 .win-deco span.popper {
   position: fixed;
   animation: win-zoom-pop ease-in infinite;
@@ -935,6 +1018,101 @@ function playVictoryJingle(): void {
   }
 }
 
+const EXPLOSION_SHAPES = ["circle", "square", "triangle", "diamond"];
+const EXPLOSION_COLORS = ["#ff0045", "#ff7e00", "#ffcc11", "#fff", "#3a3a3a"];
+
+/** 유성이 바닥에 닿는 지점(x, y)에서 여러 도형으로 이루어진 폭발을 터뜨린다. */
+function spawnExplosion(container: HTMLElement, x: number, y: number): void {
+  const explosion = document.createElement("div");
+  explosion.className = "explosion";
+  explosion.style.left = `${x}px`;
+  explosion.style.top = `${y}px`;
+
+  const flash = document.createElement("div");
+  flash.className = "flash";
+  const ring = document.createElement("div");
+  ring.className = "ring";
+  explosion.append(flash, ring);
+
+  // 불꽃 파편 — 도형과 궤적을 최대한 다양하게 흩뿌려서 부드럽고 사실적으로 보이게 한다.
+  for (let i = 0; i < 30; i++) {
+    const particle = document.createElement("div");
+    particle.className = `particle shape-${pick(EXPLOSION_SHAPES)}`;
+    const angle = Math.random() * Math.PI * 2;
+    const distance = Math.random() * 90 + 40;
+    const px = Math.cos(angle) * distance;
+    const py = Math.sin(angle) * distance;
+    const size = Math.random() * 6 + 3;
+    particle.style.setProperty("--px", `${px.toFixed(1)}px`);
+    particle.style.setProperty("--py", `${py.toFixed(1)}px`);
+    particle.style.setProperty("--pxEnd", `${(px * 1.15).toFixed(1)}px`);
+    particle.style.setProperty("--pyEnd", `${(py * 1.15 + 45).toFixed(1)}px`);
+    particle.style.width = `${size.toFixed(1)}px`;
+    particle.style.height = `${size.toFixed(1)}px`;
+    particle.style.background = pick(EXPLOSION_COLORS);
+    particle.style.animationDuration = `${(Math.random() * 0.4 + 0.5).toFixed(2)}s`;
+    explosion.appendChild(particle);
+  }
+
+  // 잔불 연기 — 위로 흐릿하게 퍼지며 사라진다.
+  for (let i = 0; i < 5; i++) {
+    const smoke = document.createElement("div");
+    smoke.className = "smoke";
+    const angle = Math.random() * Math.PI * 2;
+    const distance = Math.random() * 30 + 10;
+    smoke.style.setProperty("--sx", `${(Math.cos(angle) * distance).toFixed(1)}px`);
+    smoke.style.setProperty("--sy", `${(Math.sin(angle) * distance - 60).toFixed(1)}px`);
+    const size = Math.random() * 20 + 20;
+    smoke.style.width = `${size.toFixed(1)}px`;
+    smoke.style.height = `${size.toFixed(1)}px`;
+    smoke.style.animationDuration = `${(Math.random() * 0.5 + 0.9).toFixed(2)}s`;
+    explosion.appendChild(smoke);
+  }
+
+  container.appendChild(explosion);
+  window.setTimeout(() => explosion.remove(), 1300);
+}
+
+/**
+ * 유성우처럼 꼬리를 끌며 떨어지는 이모지를 하나 만든다. 바닥에 닿으면
+ * 20% 확률로 폭발 이펙트를 띄우고 스스로를 정리한다.
+ */
+function spawnMeteor(container: HTMLElement, overlay: HTMLElement, emojis: string[]): void {
+  const meteor = document.createElement("div");
+  meteor.className = "meteor";
+
+  const trail = document.createElement("div");
+  trail.className = "meteor-trail";
+  const emoji = document.createElement("span");
+  emoji.className = "meteor-emoji";
+  emoji.textContent = pick(emojis);
+  meteor.append(trail, emoji);
+
+  const leftPercent = Math.random() * 100;
+  const fallDuration = Math.random() * 2 + 2.5; // 2.5s ~ 4.5s
+  const drift = (Math.random() - 0.5) * 160; // 낙하하며 좌우로 흔들리는 정도
+  const tilt = Math.random() * 30 - 15; // 유성마다 살짝 다른 낙하 각도
+
+  meteor.style.left = `${leftPercent}%`;
+  meteor.style.setProperty("--drift", `${drift.toFixed(1)}px`);
+  meteor.style.setProperty("--tilt", `${tilt.toFixed(1)}deg`);
+  meteor.style.animationDuration = `${fallDuration.toFixed(2)}s`;
+
+  container.appendChild(meteor);
+
+  window.setTimeout(() => {
+    if (!document.body.contains(overlay)) return; // 이미 닫힌 뒤라면 아무것도 하지 않는다.
+
+    const rect = meteor.getBoundingClientRect();
+    const x = rect.left + rect.width / 2;
+    meteor.remove();
+
+    if (Math.random() < 0.2) {
+      spawnExplosion(container, x, window.innerHeight - 32);
+    }
+  }, fallDuration * 1000);
+}
+
 function celebrateWin(): void {
   injectWinStyles();
   playVictoryJingle();
@@ -946,19 +1124,8 @@ function celebrateWin(): void {
   deco.className = "win-deco";
   const emojis = ["🎉", "✨", "⭐", "🎊", "🥳", "🔥", "💯", "🏆", "🌈", "💥"];
 
-  // 하늘에서 마구 쏟아지는 이모지 비.
-  for (let i = 0; i < 40; i++) {
-    const span = document.createElement("span");
-    span.className = "falling";
-    span.textContent = pick(emojis);
-    span.style.left = `${Math.random() * 100}%`;
-    const fallDuration = (Math.random() * 2.5 + 2).toFixed(2);
-    const driftDuration = (Math.random() * 1.5 + 1).toFixed(2);
-    span.style.animationDuration = `${fallDuration}s, ${driftDuration}s`;
-    span.style.animationDelay = `${(Math.random() * -6).toFixed(2)}s, ${(Math.random() * -2).toFixed(2)}s`;
-    span.style.fontSize = `${(Math.random() * 1.8 + 1.2).toFixed(2)}rem`;
-    deco.appendChild(span);
-  }
+  // 하늘에서 꼬리를 끌며 쏟아지는 유성우 이모지 비. 바닥에 닿으면 가끔 터진다.
+  const meteorInterval = window.setInterval(() => spawnMeteor(deco, overlay, emojis), 180);
 
   // 갑자기 화면을 뒤덮을 만큼 확대됐다가 터지는 이모지.
   for (let i = 0; i < 14; i++) {
@@ -1017,7 +1184,10 @@ function celebrateWin(): void {
   closeBtn.type = "button";
   closeBtn.className = "win-close";
   closeBtn.textContent = "❌ 닫기 ❌";
-  closeBtn.addEventListener("click", () => overlay.remove());
+  closeBtn.addEventListener("click", () => {
+    window.clearInterval(meteorInterval);
+    overlay.remove();
+  });
 
   overlay.append(deco, marquee, title, sub, badge, counter, closeBtn);
   document.body.appendChild(overlay);
