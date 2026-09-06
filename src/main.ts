@@ -754,13 +754,19 @@ const WIN_STYLES = `
   overflow: hidden;
   background: linear-gradient(270deg, #ff0045, #ff7e00, #ffcc11, #55bb44, #39c5bb, #3355bb, #660099, #ffb4cc, #ff0045);
   background-size: 800% 800%;
-  animation: win-bg-cycle 6s linear infinite;
+  animation: win-bg-cycle 3s linear infinite, win-shake 0.3s linear infinite;
   text-align: center;
   padding: 1.2rem;
 }
 @keyframes win-bg-cycle {
   0% { background-position: 0% 50%; }
   100% { background-position: 100% 50%; }
+}
+@keyframes win-shake {
+  0%, 100% { translate: 0 0; }
+  25%      { translate: 4px -3px; }
+  50%      { translate: -4px 3px; }
+  75%      { translate: 3px 4px; }
 }
 .win-title {
   font-family: "Comic Sans MS", "Chalkboard SE", "Marker Felt", cursive;
@@ -771,13 +777,14 @@ const WIN_STYLES = `
   text-shadow:
     3px 3px 0 #ff0045, -3px -3px 0 #ffcc11,
     0 0 20px #fff, 0 0 40px #39c5bb;
-  animation: win-wiggle 0.5s ease-in-out infinite alternate, win-blink 1.1s steps(1) infinite;
+  animation: win-wiggle 0.4s ease-in-out infinite, win-blink 0.7s steps(1) infinite;
 }
 @keyframes win-wiggle {
-  from { transform: rotate(-4deg) scale(1); }
-  to   { transform: rotate(4deg) scale(1.08); }
+  0%   { transform: rotate(-8deg) scale(0.9); }
+  50%  { transform: rotate(8deg) scale(1.6); }
+  100% { transform: rotate(-8deg) scale(0.9); }
 }
-@keyframes win-blink { 50% { opacity: 0.55; } }
+@keyframes win-blink { 50% { opacity: 0.5; } }
 .win-sub {
   font-family: Papyrus, fantasy;
   font-size: clamp(1rem, 3.2vw, 1.6rem);
@@ -850,14 +857,44 @@ const WIN_STYLES = `
   inset: 0;
   pointer-events: none;
 }
-.win-deco span {
-  position: absolute;
-  animation: win-spin-bounce 1.6s ease-in-out infinite;
+.win-deco span.falling {
+  position: fixed;
+  top: -12vh;
+  will-change: transform;
+  animation-name: win-fall, win-drift;
+  animation-timing-function: linear, ease-in-out;
+  animation-iteration-count: infinite, infinite;
 }
-@keyframes win-spin-bounce {
-  0%   { transform: translateY(0) rotate(0deg); }
-  50%  { transform: translateY(-25px) rotate(180deg); }
-  100% { transform: translateY(0) rotate(360deg); }
+@keyframes win-fall {
+  from { transform: translateY(0) rotate(0deg); }
+  to   { transform: translateY(130vh) rotate(900deg); }
+}
+@keyframes win-drift {
+  0%, 100% { margin-left: -22px; }
+  50%      { margin-left: 22px; }
+}
+.win-deco span.popper {
+  position: fixed;
+  animation: win-zoom-pop ease-in infinite;
+}
+@keyframes win-zoom-pop {
+  0%   { transform: scale(0) rotate(0deg); opacity: 0; }
+  12%  { opacity: 1; }
+  55%  { transform: scale(7) rotate(35deg); opacity: 1; }
+  100% { transform: scale(0.2) rotate(-20deg); opacity: 0; }
+}
+.win-clutter {
+  position: fixed;
+  font-family: Impact, "Comic Sans MS", "Arial Black", sans-serif;
+  font-weight: 900;
+  text-shadow: 2px 2px 0 #000, -2px -2px 0 #fff;
+  animation: win-float-text ease-in-out infinite;
+  pointer-events: none;
+}
+@keyframes win-float-text {
+  0%   { transform: translateY(0) rotate(-10deg) scale(1); }
+  50%  { transform: translateY(-16px) rotate(10deg) scale(1.25); }
+  100% { transform: translateY(0) rotate(-10deg) scale(1); }
 }
 `;
 
@@ -907,16 +944,50 @@ function celebrateWin(): void {
 
   const deco = document.createElement("div");
   deco.className = "win-deco";
-  const emojis = ["🎉", "✨", "⭐", "🎊", "🥳", "🔥", "💯", "🏆"];
-  for (let i = 0; i < 18; i++) {
+  const emojis = ["🎉", "✨", "⭐", "🎊", "🥳", "🔥", "💯", "🏆", "🌈", "💥"];
+
+  // 하늘에서 마구 쏟아지는 이모지 비.
+  for (let i = 0; i < 40; i++) {
     const span = document.createElement("span");
+    span.className = "falling";
     span.textContent = pick(emojis);
     span.style.left = `${Math.random() * 100}%`;
-    span.style.top = `${Math.random() * 100}%`;
-    span.style.animationDelay = `${(Math.random() * 2).toFixed(2)}s`;
-    span.style.fontSize = `${(Math.random() * 1.5 + 1).toFixed(2)}rem`;
+    const fallDuration = (Math.random() * 2.5 + 2).toFixed(2);
+    const driftDuration = (Math.random() * 1.5 + 1).toFixed(2);
+    span.style.animationDuration = `${fallDuration}s, ${driftDuration}s`;
+    span.style.animationDelay = `${(Math.random() * -6).toFixed(2)}s, ${(Math.random() * -2).toFixed(2)}s`;
+    span.style.fontSize = `${(Math.random() * 1.8 + 1.2).toFixed(2)}rem`;
     deco.appendChild(span);
   }
+
+  // 갑자기 화면을 뒤덮을 만큼 확대됐다가 터지는 이모지.
+  for (let i = 0; i < 14; i++) {
+    const span = document.createElement("span");
+    span.className = "popper";
+    span.textContent = pick(emojis);
+    span.style.left = `${Math.random() * 90}%`;
+    span.style.top = `${Math.random() * 90}%`;
+    span.style.fontSize = "2rem";
+    span.style.animationDuration = `${(Math.random() * 1 + 1.2).toFixed(2)}s`;
+    span.style.animationDelay = `${(Math.random() * -2.2).toFixed(2)}s`;
+    deco.appendChild(span);
+  }
+
+  // 아무렇게나 흩뿌려놓은 촌스러운 감탄사 텍스트.
+  const shouts = ["대박!!!", "쩐다!!!", "레전드!!!", "미쳤다!!!", "GG!!!", "찢었다!!!", "실화냐!!!"];
+  const clutterColors = ["#ff0045", "#ff7e00", "#ffcc11", "#55bb44", "#39c5bb", "#3355bb", "#660099"];
+  shouts.forEach((text, i) => {
+    const span = document.createElement("span");
+    span.className = "win-clutter";
+    span.textContent = text;
+    span.style.left = `${Math.random() * 78}%`;
+    span.style.top = `${Math.random() * 82}%`;
+    span.style.color = clutterColors[i % clutterColors.length];
+    span.style.fontSize = `${(Math.random() * 1.2 + 1.3).toFixed(2)}rem`;
+    span.style.animationDuration = `${(Math.random() * 0.8 + 0.8).toFixed(2)}s`;
+    span.style.animationDelay = `${(Math.random() * -1.6).toFixed(2)}s`;
+    deco.appendChild(span);
+  });
 
   const marquee = document.createElement("div");
   marquee.className = "win-marquee";
