@@ -8,7 +8,7 @@
  * "실행된 것이 없다"는 사실을 명확한 문구로 알립니다.
  */
 
-type OsKind = "windows" | "mac" | "linux" | "other";
+type OsKind = "windows" | "mac" | "linux" | "ios" | "android" | "other";
 
 interface OsProfile {
   kind: OsKind;
@@ -16,7 +16,7 @@ interface OsProfile {
   prompt: string;
   scanTargets: string[];
   deleteCommand: string;
-  chrome: "windows" | "mac" | "linux";
+  chrome: "windows" | "mac" | "linux" | "mobile";
 }
 
 interface OutputLine {
@@ -28,7 +28,12 @@ interface OutputLine {
 function detectOs(): OsKind {
   const ua = navigator.userAgent;
   const platform = navigator.platform || "";
+  // iPadOS 13+의 Safari는 기본적으로 데스크톱 macOS와 같은 UA를 보내므로,
+  // 터치 포인트 개수로 iPad를 macOS와 구분한다.
+  const isTouchMac = /Mac/i.test(ua) && navigator.maxTouchPoints > 1;
 
+  if (/iPhone|iPad|iPod/i.test(ua) || isTouchMac) return "ios";
+  if (/Android/i.test(ua)) return "android";
   if (/Win/i.test(ua) || /Win/i.test(platform)) return "windows";
   if (/Mac/i.test(ua) || /Mac/i.test(platform)) return "mac";
   if (/Linux/i.test(ua) || /Linux/i.test(platform)) return "linux";
@@ -73,6 +78,33 @@ function getOsProfile(kind: OsKind): OsProfile {
         scanTargets: ["/etc", "/home/guest/Documents", "/var/log", "/boot"],
         deleteCommand: "sudo rm -rf /etc",
         chrome: "linux",
+      };
+    case "android":
+      return {
+        kind,
+        windowTitle: "Terminal",
+        prompt: "u0_a123@android:~$",
+        scanTargets: [
+          "/storage/emulated/0/DCIM",
+          "/storage/emulated/0/Download",
+          "/data/data",
+          "/sdcard/Android/data",
+        ],
+        deleteCommand: "rm -rf /storage/emulated/0/DCIM",
+        chrome: "mobile",
+      };
+    case "ios":
+      return {
+        kind,
+        windowTitle: "Terminal",
+        prompt: "guest@iPhone ~ %",
+        scanTargets: [
+          "/var/mobile/Media/DCIM",
+          "/private/var/mobile/Containers",
+          "/var/mobile/Library",
+        ],
+        deleteCommand: "rm -rf /var/mobile/Media/DCIM",
+        chrome: "mobile",
       };
     default:
       return {
@@ -189,6 +221,20 @@ const TERMINAL_STYLES = `
     justify-content: center;
     color: #c9c9c9;
   }
+  .titlebar--mobile {
+    background: #202020;
+    justify-content: center;
+    gap: 8px;
+    color: #e4e4e4;
+    font-weight: 600;
+  }
+  .titlebar--mobile .badge {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #39c5bb;
+    display: inline-block;
+  }
   #screen {
     height: calc(100% - 32px);
     padding: 14px 16px;
@@ -235,9 +281,16 @@ function renderTitlebar(doc: Document, profile: OsProfile): HTMLElement {
     label.className = "label";
     label.textContent = profile.windowTitle;
     bar.appendChild(label);
-  } else {
+  } else if (profile.chrome === "linux") {
     bar.className = "titlebar titlebar--linux";
     bar.textContent = profile.windowTitle;
+  } else {
+    bar.className = "titlebar titlebar--mobile";
+    const badge = doc.createElement("span");
+    badge.className = "badge";
+    const label = doc.createElement("span");
+    label.textContent = profile.windowTitle;
+    bar.append(badge, label);
   }
 
   return bar;
