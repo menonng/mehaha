@@ -203,93 +203,94 @@ function pushFrames(lines: OutputLine[], count: number): void {
 function buildScript(profile: OsProfile): OutputLine[] {
   const lines: OutputLine[] = [];
 
-  lines.push({ text: `${profile.prompt} verify --save-data`, delayAfter: 500 });
-  lines.push({ text: "무결성 검사를 시작합니다...", delayAfter: 450 });
+  // ---- 도입부: 여기까지는 사람이 읽을 수 있는 속도로, 총 2초를 넘기지 않는다. ----
+  lines.push({ text: `${profile.prompt} verify --save-data`, delayAfter: 300 });
+  lines.push({ text: "무결성 검사를 시작합니다...", delayAfter: 220 });
 
   for (const target of profile.scanTargets) {
     lines.push({
       text: `검사 중: ${target}  (${randomSize()})`,
-      delayAfter: 220,
+      delayAfter: 110,
     });
   }
 
-  lines.push({ text: "", delayAfter: 150 });
+  lines.push({ text: "", delayAfter: 60 });
   lines.push({
     text: "검사 결과: 저장 데이터 불일치가 감지되었습니다.",
     className: "line-warn",
-    delayAfter: 500,
+    delayAfter: 220,
   });
   lines.push({
     text: `${profile.prompt} ${profile.deleteCommand}`,
     className: "line-cmd",
-    delayAfter: 700,
+    delayAfter: 260,
   });
 
-  for (let pct = 0; pct <= 100; pct += 20) {
+  for (let pct = 0; pct <= 100; pct += 50) {
     lines.push({
       text: `정리 진행률: ${pct}%`,
       className: "line-progress",
-      delayAfter: 140,
+      delayAfter: 90,
     });
   }
 
   // ---- 여기서부터 처리되지 않은 예외가 발생한 것처럼 보이는 대량의
-  // 스택 트레이스/로그가 쏟아진다. 실제로 아무것도 실행하지 않으며,
-  // 전부 문자열을 화면에 출력할 뿐이다. ----
-  lines.push({ text: "", delayAfter: 200 });
+  // 스택 트레이스/로그가 약 3초에 걸쳐 빠르게 쏟아진다. 실제로 아무것도
+  // 실행하지 않으며, 전부 문자열을 화면에 출력할 뿐이다. ----
+  lines.push({ text: "", delayAfter: 60 });
   lines.push({
     text: "치명적 오류: 정리 스레드에서 처리되지 않은 예외가 발생했습니다.",
     className: "line-warn",
-    delayAfter: 350,
+    delayAfter: 40,
   });
-  lines.push({ text: "", delayAfter: 150 });
-  lines.push({ text: "---- 예외 보고서 ----", delayAfter: 250 });
-  lines.push({ text: `생성 시각: ${new Date().toISOString()}`, delayAfter: 120 });
-  lines.push({ text: `스레드: "${pick(THREAD_NAMES)}" #${Math.floor(Math.random() * 40) + 1}`, delayAfter: 120 });
-  lines.push({ text: `참조 주소: ${randomHex(4)}`, delayAfter: 200 });
-  lines.push({ text: "", delayAfter: 150 });
+  lines.push({ text: "", delayAfter: 40 });
+  lines.push({ text: "---- 예외 보고서 ----", delayAfter: 40 });
+  lines.push({ text: `생성 시각: ${new Date().toISOString()}`, delayAfter: 30 });
+  lines.push({ text: `스레드: "${pick(THREAD_NAMES)}" #${Math.floor(Math.random() * 40) + 1}`, delayAfter: 30 });
+  lines.push({ text: `참조 주소: ${randomHex(4)}`, delayAfter: 40 });
+  lines.push({ text: "", delayAfter: 40 });
 
   lines.push({
     text: `core.integrity.IntegrityFaultException: unexpected state while finalizing cleanup task`,
     className: "line-warn",
-    delayAfter: 40,
+    delayAfter: 20,
   });
-  pushFrames(lines, 9);
+  pushFrames(lines, 34);
 
   lines.push({
     text: `Caused by: core.fs.NativeBridge$AccessException: native call rejected by sandbox policy`,
-    delayAfter: 40,
+    delayAfter: 20,
   });
-  lines.push({ text: `    path: ${pick(profile.scanTargets)}`, className: "line-trace", delayAfter: 30 });
-  lines.push({ text: `    fd: ${Math.floor(Math.random() * 90) + 3}, flags: O_RDWR|O_TRUNC`, className: "line-trace", delayAfter: 30 });
-  pushFrames(lines, 7);
+  lines.push({ text: `    path: ${pick(profile.scanTargets)}`, className: "line-trace", delayAfter: 18 });
+  lines.push({ text: `    fd: ${Math.floor(Math.random() * 90) + 3}, flags: O_RDWR|O_TRUNC`, className: "line-trace", delayAfter: 18 });
+  pushFrames(lines, 27);
 
   lines.push({
     text: `Caused by: core.security.PolicyEngine$RemediationException: automated remediation command flagged`,
-    delayAfter: 40,
+    delayAfter: 20,
   });
-  lines.push({ text: `    command: ${profile.prompt} ${profile.deleteCommand}`, className: "line-cmd", delayAfter: 30 });
-  lines.push({ text: `    exit_code: ${pick([1, 13, 126])} (${pick(["operation not permitted", "resource busy", "blocked by sandbox"])})`, className: "line-trace", delayAfter: 30 });
-  pushFrames(lines, 8);
+  lines.push({ text: `    command: ${profile.prompt} ${profile.deleteCommand}`, className: "line-cmd", delayAfter: 18 });
+  lines.push({ text: `    exit_code: ${pick([1, 13, 126])} (${pick(["operation not permitted", "resource busy", "blocked by sandbox"])})`, className: "line-trace", delayAfter: 18 });
+  pushFrames(lines, 27);
 
-  lines.push({ text: "", delayAfter: 200 });
-  lines.push({ text: "-- 시스템 정보 --", delayAfter: 250 });
-  lines.push({ text: "세부 정보:", delayAfter: 120 });
-  lines.push({ text: `\t기기 프로필: ${profile.windowTitle} (${profile.kind})`, className: "line-trace", delayAfter: 90 });
-  lines.push({ text: `\t활성 스레드: ${pick(THREAD_NAMES)}`, className: "line-trace", delayAfter: 90 });
-  lines.push({ text: `\t검사 대상 경로: ${profile.scanTargets.join(", ")}`, className: "line-trace", delayAfter: 90 });
-  lines.push({ text: `\t마지막 작업: ${profile.deleteCommand}`, className: "line-trace", delayAfter: 90 });
+  lines.push({ text: "", delayAfter: 60 });
+  lines.push({ text: "-- 시스템 정보 --", delayAfter: 30 });
+  lines.push({ text: "세부 정보:", delayAfter: 20 });
+  lines.push({ text: `\t기기 프로필: ${profile.windowTitle} (${profile.kind})`, className: "line-trace", delayAfter: 50 });
+  lines.push({ text: `\t활성 스레드: ${pick(THREAD_NAMES)}`, className: "line-trace", delayAfter: 50 });
+  lines.push({ text: `\t검사 대상 경로: ${profile.scanTargets.join(", ")}`, className: "line-trace", delayAfter: 50 });
+  lines.push({ text: `\t마지막 작업: ${profile.deleteCommand}`, className: "line-trace", delayAfter: 50 });
   lines.push({
     text: `\t메모리 사용량: ${Math.floor(Math.random() * 900) + 100}MB / ${(Math.floor(Math.random() * 4) + 4) * 1024}MB`,
     className: "line-trace",
-    delayAfter: 90,
+    delayAfter: 50,
   });
-  lines.push({ text: `\t보고서 ID: ${randomHex(8)}`, className: "line-trace", delayAfter: 300 });
+  lines.push({ text: `\t보고서 ID: ${randomHex(8)}`, className: "line-trace", delayAfter: 50 });
 
-  lines.push({ text: "", delayAfter: 300 });
+  lines.push({ text: "", delayAfter: 90 });
   lines.push({
     text: "이 예외의 원인, 코드 경로, 조치 방법에 대한 전체 보고서는 아래에서 확인할 수 있습니다.",
-    delayAfter: 500,
+    delayAfter: 200,
   });
   lines.push({ text: REPO_URL, href: REPO_URL, className: "line-help", delayAfter: 0 });
 
