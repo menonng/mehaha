@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Number Guess</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <main class="card">
+    <h1>숫자 맞추기</h1>
+    <p class="sub">1부터 10 사이의 숫자를 하나 골랐습니다. 맞혀보세요.</p>
+
+    <form id="guess-form" autocomplete="off">
+      <input
+        id="guess-input"
+        type="number"
+        min="1"
+        max="10"
+        required
+        placeholder="1 - 10"
+      />
+      <button type="submit">확인</button>
+    </form>
+
+    <p id="result" class="result" role="status" aria-live="polite"></p>
+  </main>
+
+  <script type="module" src="dist/main.js"></script>
+</body>
+</html>

@@ -1,0 +1,14 @@
+{
+  "name": "mehaha-prank-page",
+  "version": "1.0.0",
+  "private": true,
+  "description": "친구를 놀래키는 장난용 GitHub Pages (실제로는 아무것도 삭제하지 않는 100% 눈속임)",
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "watch": "tsc -p tsconfig.json --watch"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.4"
+  }
+}
