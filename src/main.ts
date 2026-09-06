@@ -737,6 +737,221 @@ function renderInline(profile: OsProfile, lines: OutputLine[]): void {
   playScript(document, screen, lines, () => closed);
 }
 
+// ---- 정답을 맞혔을 때 뜨는, 일부러 촌스럽고 과장된 "B급" 축하 연출.
+// 폰트는 일부러 안 어울리는 것들을 섞고, 배경은 지정된 팔레트 8색을
+// 그대로 무지개처럼 순환시킨다(팔레트를 벗어나지 않으면서도 요란하게). ----
+
+const WIN_STYLES = `
+.win-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.9rem;
+  overflow: hidden;
+  background: linear-gradient(270deg, #ff0045, #ff7e00, #ffcc11, #55bb44, #39c5bb, #3355bb, #660099, #ffb4cc, #ff0045);
+  background-size: 800% 800%;
+  animation: win-bg-cycle 6s linear infinite;
+  text-align: center;
+  padding: 1.2rem;
+}
+@keyframes win-bg-cycle {
+  0% { background-position: 0% 50%; }
+  100% { background-position: 100% 50%; }
+}
+.win-title {
+  font-family: "Comic Sans MS", "Chalkboard SE", "Marker Felt", cursive;
+  font-size: clamp(2.2rem, 9vw, 5rem);
+  font-weight: 900;
+  color: #fff;
+  -webkit-text-stroke: 2px #660099;
+  text-shadow:
+    3px 3px 0 #ff0045, -3px -3px 0 #ffcc11,
+    0 0 20px #fff, 0 0 40px #39c5bb;
+  animation: win-wiggle 0.5s ease-in-out infinite alternate, win-blink 1.1s steps(1) infinite;
+}
+@keyframes win-wiggle {
+  from { transform: rotate(-4deg) scale(1); }
+  to   { transform: rotate(4deg) scale(1.08); }
+}
+@keyframes win-blink { 50% { opacity: 0.55; } }
+.win-sub {
+  font-family: Papyrus, fantasy;
+  font-size: clamp(1rem, 3.2vw, 1.6rem);
+  color: #fff;
+  text-shadow: 2px 2px 0 #000, 0 0 10px #ffcc11;
+  max-width: 90vw;
+}
+.win-marquee {
+  width: 100%;
+  overflow: hidden;
+  background: #000;
+  border-top: 4px dashed #ffcc11;
+  border-bottom: 4px dashed #ffcc11;
+  padding: 0.4rem 0;
+}
+.win-marquee span {
+  display: inline-block;
+  white-space: nowrap;
+  font-family: Impact, "Arial Black", sans-serif;
+  font-size: 1.1rem;
+  color: #ffcc11;
+  animation: win-marquee-scroll 9s linear infinite;
+  padding-left: 100%;
+}
+@keyframes win-marquee-scroll {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-100%); }
+}
+.win-badge {
+  font-family: "Brush Script MT", cursive;
+  font-size: clamp(1rem, 3vw, 1.4rem);
+  background: #fff;
+  color: #660099;
+  border: 4px double #ff0045;
+  border-radius: 999px;
+  padding: 0.5rem 1.2rem;
+  box-shadow: 0 0 0 4px #ffcc11, 0 6px 14px rgba(0, 0, 0, 0.4);
+  animation: win-bounce 0.8s ease-in-out infinite alternate;
+}
+@keyframes win-bounce {
+  from { transform: translateY(0); }
+  to   { transform: translateY(-10px); }
+}
+.win-counter {
+  font-family: "Courier New", monospace;
+  font-size: 1rem;
+  color: #55bb44;
+  background: #000;
+  border: 2px inset #888;
+  padding: 0.3rem 0.8rem;
+  letter-spacing: 2px;
+}
+.win-close {
+  margin-top: 0.4rem;
+  font-family: "Comic Sans MS", cursive;
+  font-size: 1rem;
+  font-weight: bold;
+  color: #fff;
+  background: linear-gradient(180deg, #ff7e00, #ff0045);
+  border: 3px outset #ffcc11;
+  border-radius: 10px;
+  padding: 0.5rem 1.1rem;
+  cursor: pointer;
+}
+.win-close:active {
+  border-style: inset;
+}
+.win-deco {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.win-deco span {
+  position: absolute;
+  animation: win-spin-bounce 1.6s ease-in-out infinite;
+}
+@keyframes win-spin-bounce {
+  0%   { transform: translateY(0) rotate(0deg); }
+  50%  { transform: translateY(-25px) rotate(180deg); }
+  100% { transform: translateY(0) rotate(360deg); }
+}
+`;
+
+function injectWinStyles(): void {
+  if (document.getElementById("win-styles")) return;
+  const style = document.createElement("style");
+  style.id = "win-styles";
+  style.textContent = WIN_STYLES;
+  document.head.appendChild(style);
+}
+
+/** 8비트 게임기 승리 팡파레 느낌의 짧은 아르페지오. 재생 실패해도 무시한다. */
+function playVictoryJingle(): void {
+  try {
+    const AudioCtxClass =
+      window.AudioContext ??
+      (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    if (!AudioCtxClass) return;
+
+    const ctx = new AudioCtxClass();
+    const notes = [523.25, 659.25, 783.99, 1046.5, 1318.5]; // C5 E5 G5 C6 E6
+    let t = ctx.currentTime;
+
+    for (const freq of notes) {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = "square";
+      osc.frequency.value = freq;
+      gain.gain.setValueAtTime(0.15, t);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.18);
+      osc.connect(gain).connect(ctx.destination);
+      osc.start(t);
+      osc.stop(t + 0.2);
+      t += 0.12;
+    }
+  } catch {
+    // 오디오가 막혀도 축하 화면 자체는 그대로 보여준다.
+  }
+}
+
+function celebrateWin(): void {
+  injectWinStyles();
+  playVictoryJingle();
+
+  const overlay = document.createElement("div");
+  overlay.className = "win-overlay";
+
+  const deco = document.createElement("div");
+  deco.className = "win-deco";
+  const emojis = ["🎉", "✨", "⭐", "🎊", "🥳", "🔥", "💯", "🏆"];
+  for (let i = 0; i < 18; i++) {
+    const span = document.createElement("span");
+    span.textContent = pick(emojis);
+    span.style.left = `${Math.random() * 100}%`;
+    span.style.top = `${Math.random() * 100}%`;
+    span.style.animationDelay = `${(Math.random() * 2).toFixed(2)}s`;
+    span.style.fontSize = `${(Math.random() * 1.5 + 1).toFixed(2)}rem`;
+    deco.appendChild(span);
+  }
+
+  const marquee = document.createElement("div");
+  marquee.className = "win-marquee";
+  const marqueeInner = document.createElement("span");
+  marqueeInner.textContent =
+    "★☆★ WINNER WINNER ★☆★ 당신은 숫자의 지배자입니다 ★☆★ 전 우주가 당신을 축하합니다 ★☆★ ";
+  marquee.appendChild(marqueeInner);
+
+  const title = document.createElement("div");
+  title.className = "win-title";
+  title.textContent = "★ CONGRATULATIONS ★";
+
+  const sub = document.createElement("div");
+  sub.className = "win-sub";
+  sub.textContent = "정답입니다!!! 당신은 이 시대 최고의 숫자 예언가입니다!!!";
+
+  const badge = document.createElement("div");
+  badge.className = "win-badge";
+  badge.textContent = "🏆 OFFICIAL WINNER CERTIFICATE 🏆";
+
+  const counter = document.createElement("div");
+  counter.className = "win-counter";
+  const visitorNo = String(Math.floor(Math.random() * 9000) + 1000).padStart(7, "0");
+  counter.textContent = `방문자 수: ${visitorNo} 명 (since 1999)`;
+
+  const closeBtn = document.createElement("button");
+  closeBtn.type = "button";
+  closeBtn.className = "win-close";
+  closeBtn.textContent = "❌ 닫기 ❌";
+  closeBtn.addEventListener("click", () => overlay.remove());
+
+  overlay.append(deco, marquee, title, sub, badge, counter, closeBtn);
+  document.body.appendChild(overlay);
+}
+
 function main(): void {
   const form = document.querySelector<HTMLFormElement>("#guess-form");
   const input = document.querySelector<HTMLInputElement>("#guess-input");
@@ -756,6 +971,7 @@ function main(): void {
       result.className = "result win";
       form.querySelector("button")?.setAttribute("disabled", "true");
       input.setAttribute("disabled", "true");
+      celebrateWin();
       return;
     }
 
