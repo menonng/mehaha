@@ -39,6 +39,11 @@ jobs:
           mkdir -p site
           cp index.html style.css site/
           cp -r dist site/dist
+          # 캐시 무효화: 매 배포마다 커밋 SHA를 쿼리스트링으로 붙여서
+          # 브라우저/CDN이 이전 빌드의 main.js·style.css를 재사용하지 않게 한다.
+          SHORT_SHA="${GITHUB_SHA::8}"
+          sed -i "s/dist\/main\.js\"/dist\/main.js?v=${SHORT_SHA}\"/" site/index.html
+          sed -i "s/style\.css\"/style.css?v=${SHORT_SHA}\"/" site/index.html
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
