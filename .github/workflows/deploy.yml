@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - claude/github-page-prank-a760o7
   workflow_dispatch: {}
 
 permissions:
