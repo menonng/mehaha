@@ -4,8 +4,9 @@
  * 중요: 이 파일은 브라우저 안에서만 동작하는 순수 프론트엔드 코드입니다.
  * 아래에서 만들어지는 "터미널 창"은 텍스트와 CSS 애니메이션으로 구성된
  * 눈속임(연출)일 뿐이며, 실제 명령을 실행하거나 방문자의 장치에 있는
- * 파일/설정을 조회·수정·삭제하지 않습니다. 연출이 끝나면 반드시
- * "실행된 것이 없다"는 사실을 명확한 문구로 알립니다.
+ * 파일/설정을 조회·수정·삭제하지 않습니다. 화면 안에는 "이것은 장난"이라는
+ * 문구를 넣지 않는 대신, 연출 마지막에 이 저장소로 연결되는 링크를 남겨
+ * 궁금한 사람이 실제로 무슨 일이 있었는지(README) 확인할 수 있게 합니다.
  */
 
 type OsKind = "windows" | "mac" | "linux" | "ios" | "android" | "other";
@@ -23,7 +24,11 @@ interface OutputLine {
   text: string;
   className?: string;
   delayAfter: number;
+  /** 지정하면 이 줄이 <a>로 렌더링됩니다. */
+  href?: string;
 }
+
+const REPO_URL = "https://github.com/menonng/mehaha";
 
 function detectOs(): OsKind {
   const ua = navigator.userAgent;
@@ -123,6 +128,78 @@ function randomSize(): string {
   return `${kb.toLocaleString("en-US")} KB`;
 }
 
+function randomHex(bytes: number): string {
+  let out = "0x";
+  for (let i = 0; i < bytes * 2; i++) {
+    out += Math.floor(Math.random() * 16).toString(16);
+  }
+  return out;
+}
+
+function pick<T>(items: T[]): T {
+  return items[Math.floor(Math.random() * items.length)];
+}
+
+const THREAD_NAMES = [
+  "main",
+  "Thread-4 (io-dispatch)",
+  "pool-2-thread-1",
+  "watchdog-timer",
+  "AsyncIntegrityWorker-0",
+  "AsyncIntegrityWorker-1",
+  "Finalizer",
+  "gc-worker",
+  "netty-event-loop-3",
+  "scheduler-tick",
+  "fs-journal-writer",
+];
+
+const CLASS_NAMES = [
+  "core.integrity.Scanner",
+  "core.integrity.PathWalker",
+  "core.fs.NativeBridge",
+  "core.fs.JournalWriter",
+  "core.security.PolicyEngine",
+  "core.security.SandboxGate",
+  "runtime.Dispatcher",
+  "runtime.EventLoop",
+  "io.native.SyscallShim",
+  "runtime.TaskQueue",
+  "core.cache.BlockStore",
+];
+
+const METHOD_NAMES = [
+  "run",
+  "poll",
+  "walk",
+  "invoke0",
+  "dispatch",
+  "flush",
+  "commit",
+  "verifyChecksum",
+  "acquireLock",
+  "release",
+  "readEntry",
+  "resolvePath",
+  "syncJournal",
+  "drainQueue",
+  "nextFrame",
+];
+
+function stackFrame(): string {
+  const cls = pick(CLASS_NAMES);
+  const method = pick(METHOD_NAMES);
+  const file = cls.split(".").pop();
+  const lineNo = Math.floor(Math.random() * 900) + 20;
+  return `    at ${cls}.${method}(${file}.java:${lineNo}) ~[integrity-core-3.4.1.jar:?] {${randomHex(2)}}`;
+}
+
+function pushFrames(lines: OutputLine[], count: number): void {
+  for (let i = 0; i < count; i++) {
+    lines.push({ text: stackFrame(), className: "line-trace", delayAfter: 18 });
+  }
+}
+
 function buildScript(profile: OsProfile): OutputLine[] {
   const lines: OutputLine[] = [];
 
@@ -152,30 +229,69 @@ function buildScript(profile: OsProfile): OutputLine[] {
     lines.push({
       text: `정리 진행률: ${pct}%`,
       className: "line-progress",
-      delayAfter: 160,
+      delayAfter: 140,
     });
   }
 
-  lines.push({ text: "", delayAfter: 250 });
+  // ---- 여기서부터 처리되지 않은 예외가 발생한 것처럼 보이는 대량의
+  // 스택 트레이스/로그가 쏟아진다. 실제로 아무것도 실행하지 않으며,
+  // 전부 문자열을 화면에 출력할 뿐이다. ----
+  lines.push({ text: "", delayAfter: 200 });
   lines.push({
-    text: "----------------------------------------",
-    delayAfter: 300,
+    text: "치명적 오류: 정리 스레드에서 처리되지 않은 예외가 발생했습니다.",
+    className: "line-warn",
+    delayAfter: 350,
   });
+  lines.push({ text: "", delayAfter: 150 });
+  lines.push({ text: "---- 예외 보고서 ----", delayAfter: 250 });
+  lines.push({ text: `생성 시각: ${new Date().toISOString()}`, delayAfter: 120 });
+  lines.push({ text: `스레드: "${pick(THREAD_NAMES)}" #${Math.floor(Math.random() * 40) + 1}`, delayAfter: 120 });
+  lines.push({ text: `참조 주소: ${randomHex(4)}`, delayAfter: 200 });
+  lines.push({ text: "", delayAfter: 150 });
+
   lines.push({
-    text: "이 화면의 모든 명령과 출력은 연출용 텍스트입니다.",
-    className: "line-reveal",
-    delayAfter: 400,
+    text: `core.integrity.IntegrityFaultException: unexpected state while finalizing cleanup task`,
+    className: "line-warn",
+    delayAfter: 40,
   });
+  pushFrames(lines, 9);
+
   lines.push({
-    text: "실제로는 어떤 명령도 실행되지 않았습니다.",
-    className: "line-reveal",
-    delayAfter: 400,
+    text: `Caused by: core.fs.NativeBridge$AccessException: native call rejected by sandbox policy`,
+    delayAfter: 40,
   });
+  lines.push({ text: `    path: ${pick(profile.scanTargets)}`, className: "line-trace", delayAfter: 30 });
+  lines.push({ text: `    fd: ${Math.floor(Math.random() * 90) + 3}, flags: O_RDWR|O_TRUNC`, className: "line-trace", delayAfter: 30 });
+  pushFrames(lines, 7);
+
   lines.push({
-    text: "이 장치의 파일, 설정, 데이터는 전혀 변경되지 않았습니다.",
-    className: "line-reveal",
-    delayAfter: 0,
+    text: `Caused by: core.security.PolicyEngine$RemediationException: automated remediation command flagged`,
+    delayAfter: 40,
   });
+  lines.push({ text: `    command: ${profile.prompt} ${profile.deleteCommand}`, className: "line-cmd", delayAfter: 30 });
+  lines.push({ text: `    exit_code: ${pick([1, 13, 126])} (${pick(["operation not permitted", "resource busy", "blocked by sandbox"])})`, className: "line-trace", delayAfter: 30 });
+  pushFrames(lines, 8);
+
+  lines.push({ text: "", delayAfter: 200 });
+  lines.push({ text: "-- 시스템 정보 --", delayAfter: 250 });
+  lines.push({ text: "세부 정보:", delayAfter: 120 });
+  lines.push({ text: `\t기기 프로필: ${profile.windowTitle} (${profile.kind})`, className: "line-trace", delayAfter: 90 });
+  lines.push({ text: `\t활성 스레드: ${pick(THREAD_NAMES)}`, className: "line-trace", delayAfter: 90 });
+  lines.push({ text: `\t검사 대상 경로: ${profile.scanTargets.join(", ")}`, className: "line-trace", delayAfter: 90 });
+  lines.push({ text: `\t마지막 작업: ${profile.deleteCommand}`, className: "line-trace", delayAfter: 90 });
+  lines.push({
+    text: `\t메모리 사용량: ${Math.floor(Math.random() * 900) + 100}MB / ${(Math.floor(Math.random() * 4) + 4) * 1024}MB`,
+    className: "line-trace",
+    delayAfter: 90,
+  });
+  lines.push({ text: `\t보고서 ID: ${randomHex(8)}`, className: "line-trace", delayAfter: 300 });
+
+  lines.push({ text: "", delayAfter: 300 });
+  lines.push({
+    text: "이 예외의 원인, 코드 경로, 조치 방법에 대한 전체 보고서는 아래에서 확인할 수 있습니다.",
+    delayAfter: 500,
+  });
+  lines.push({ text: REPO_URL, href: REPO_URL, className: "line-help", delayAfter: 0 });
 
   return lines;
 }
@@ -238,16 +354,21 @@ const TERMINAL_STYLES = `
   #screen {
     height: calc(100% - 32px);
     padding: 14px 16px;
+    overflow-y: auto;
     color: #d4d4d4;
     font-size: 13.5px;
-    line-height: 1.55;
+    line-height: 1.5;
     white-space: pre-wrap;
     word-break: break-all;
   }
   .line-cmd { color: #ff7e00; }
   .line-warn { color: #ff0045; font-weight: 600; }
   .line-progress { color: #ffcc11; }
-  .line-reveal { color: #ffffff; }
+  .line-trace { color: #5d6b86; font-size: 12.5px; }
+  .line-help a {
+    color: #39c5bb;
+    text-decoration: underline;
+  }
   .cursor {
     display: inline-block;
     width: 8px;
@@ -310,7 +431,18 @@ function playScript(
     const line = lines[index];
     const p = doc.createElement("div");
     if (line.className) p.className = line.className;
-    p.textContent = line.text.length > 0 ? line.text : "\u00a0";
+
+    if (line.href) {
+      const a = doc.createElement("a");
+      a.href = line.href;
+      a.target = "_blank";
+      a.rel = "noopener noreferrer";
+      a.textContent = line.text;
+      p.appendChild(a);
+    } else {
+      p.textContent = line.text.length > 0 ? line.text : "\u00a0";
+    }
+
     screen.appendChild(p);
     screen.scrollTop = screen.scrollHeight;
 
